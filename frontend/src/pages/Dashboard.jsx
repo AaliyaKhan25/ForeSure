@@ -3,6 +3,7 @@ import { useForecastData } from "../hooks/useForecastData.js";
 import BriefingCard from "../components/BriefingCard.jsx";
 import ForecastChart from "../components/ForecastChart.jsx";
 import ForecastInsights from "../components/ForecastInsights.jsx";
+import BuyerSurvey from "../components/BuyerSurvey.jsx";
 import TimeMachine from "../components/TimeMachine.jsx";
 import UncertaintyBand from "../components/UncertaintyBand.jsx";
 import MetricsPanel from "../components/MetricsPanel.jsx";
@@ -162,6 +163,10 @@ function HomePage({ metrics, briefing, forecast, loading }) {
         </div>
       </Reveal>
 
+      <Reveal className="wrap survey-reveal">
+        <BuyerSurvey />
+      </Reveal>
+
       <Reveal as="section" className="closing-panel wrap section-arrival">
         <p className="eyebrow">A little more certainty, where it counts</p>
         <h2>Make your next wind decision with <em>the full picture.</em></h2>
@@ -169,6 +174,7 @@ function HomePage({ metrics, briefing, forecast, loading }) {
           View the daily briefing <span aria-hidden="true">↗</span>
         </NavLink>
       </Reveal>
+
     </main>
   );
 }
@@ -268,7 +274,10 @@ function MethodPage() {
             Daily energy estimates sum half-hour average power over 30-minute intervals. Daypart
             averages use UK local time. Ramp-direction agreement compares consecutive half-hour
             up/down changes where both observed changes are non-zero; peak timing difference is
-            the absolute time between forecast and actual daily peaks.
+            the absolute time between forecast and actual daily peaks. Output percentiles and the
+            distribution chart describe the spread of half-hour values within that delivery day,
+            not probabilistic confidence. RMSE gives larger misses more weight, while weighted
+            absolute error is total absolute error divided by total actual generation.
           </p>
         </div>
       </Reveal>

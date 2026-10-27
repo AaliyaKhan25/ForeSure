@@ -1,4 +1,21 @@
 import { clock, gw, mw } from "../utils/format.js";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+function percentile(values, fraction) {
+  if (!values.length) return null;
+  const index = (values.length - 1) * fraction;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  return values[lower] + (values[upper] - values[lower]) * (index - lower);
+}
 
 function summarize(points) {
   const usable = points
@@ -8,15 +25,26 @@ function summarize(points) {
   if (!usable.length) return null;
 
   const average = usable.reduce((sum, point) => sum + point.forecast, 0) / usable.length;
+  const forecastValues = usable.map((point) => point.forecast).sort((a, b) => a - b);
+  const variance = forecastValues.reduce((sum, value) => sum + (value - average) ** 2, 0) / forecastValues.length;
   const energyGwh = (usable.reduce((sum, point) => sum + point.forecast, 0) * 0.5) / 1000;
   const peak = usable.reduce((best, point) => point.forecast > best.forecast ? point : best);
   const lowest = usable.reduce((best, point) => point.forecast < best.forecast ? point : best);
-  const swing = usable.slice(1).reduce((largest, point, index) => {
+  const forecastChanges = usable.slice(1).reduce((changes, point, index) => {
+    if (Date.parse(point.time) - Date.parse(usable[index].time) !== 30 * 60000) return changes;
     const change = point.forecast - usable[index].forecast;
-    return Math.abs(change) > Math.abs(largest.change)
-      ? { change, time: point.time }
-      : largest;
-  }, { change: 0, time: usable[0].time });
+    changes.push({ change, time: point.time });
+    return changes;
+  }, []);
+  const swing = forecastChanges.reduce((largest, change) =>
+    Math.abs(change.change) > Math.abs(largest.change) ? change : largest,
+  { change: 0, time: usable[0].time });
+  const largestRampUp = forecastChanges.reduce((largest, change) =>
+    change.change > largest.change ? change : largest,
+  { change: 0, time: usable[0].time });
+  const largestRampDown = forecastChanges.reduce((largest, change) =>
+    change.change < largest.change ? change : largest,
+  { change: 0, time: usable[0].time });
   const rangeHalfWidths = usable
     .filter((point) => Number.isFinite(point.lower) && Number.isFinite(point.upper))
     .map((point) => (point.upper - point.lower) / 2);
@@ -69,6 +97,13 @@ function summarize(points) {
   const actualMae = errors.length
     ? errors.reduce((sum, error) => sum + Math.abs(error), 0) / errors.length
     : null;
+  const actualRmse = errors.length
+    ? Math.sqrt(errors.reduce((sum, error) => sum + error ** 2, 0) / errors.length)
+    : null;
+  const totalActual = actuals.reduce((sum, point) => sum + point.actual, 0);
+  const actualWape = totalActual > 0
+    ? (errors.reduce((sum, error) => sum + Math.abs(error), 0) / totalActual) * 100
+    : null;
   const actualBias = errors.length
     ? errors.reduce((sum, error) => sum + error, 0) / errors.length
     : null;
@@ -81,16 +116,42 @@ function summarize(points) {
   const bandSample = actuals.filter((point) =>
     Number.isFinite(point.lower) && Number.isFinite(point.upper)
   ).length;
+  const distributionValues = [
+    ...forecastValues,
+    ...actuals.map((point) => point.actual).filter(Number.isFinite),
+  ].sort((a, b) => a - b);
+  const minOutput = distributionValues[0];
+  const maxOutput = distributionValues[distributionValues.length - 1];
+  const binWidth = Math.max((maxOutput - minOutput) / 6, 1);
+  const distribution = Array.from({ length: 6 }, (_, index) => {
+    const lower = minOutput + index * binWidth;
+    const upper = index === 5 ? maxOutput : minOutput + (index + 1) * binWidth;
+    const includes = (value) => Number.isFinite(value) &&
+      value >= lower && (index === 5 ? value <= upper : value < upper);
+    return {
+      range: `${gw(lower)}–${gw(upper)} GW`,
+      forecast: forecastValues.filter(includes).length,
+      actual: actuals.filter((point) => includes(point.actual)).length,
+    };
+  });
 
   return {
     periods: usable.length,
     average,
+    volatility: Math.sqrt(variance),
+    p10: percentile(forecastValues, 0.1),
+    median: percentile(forecastValues, 0.5),
+    p90: percentile(forecastValues, 0.9),
     energyGwh,
     peak,
     lowest,
     swing,
+    largestRampUp,
+    largestRampDown,
     averageRange,
     actualMae,
+    actualRmse,
+    actualWape,
     actualBias,
     actualAverage,
     actualEnergyGwh: actualAverage == null ? null : (actualAverage * actuals.length * 0.5) / 1000,
@@ -102,6 +163,7 @@ function summarize(points) {
     bandCoverage: bandSample ? (inRange / bandSample) * 100 : null,
     actualCount: errors.length,
     bandSample,
+    distribution,
   };
 }
 
@@ -179,7 +241,57 @@ export default function ForecastInsights({ points, revealed }) {
           value={stats.averageRange == null ? "—" : `±${mw(stats.averageRange)} MW`}
           detail="Mean half-width of the likely range"
         />
+        <Metric
+          label="Forecast volatility"
+          value={`±${mw(stats.volatility)} MW`}
+          detail="Standard deviation across the day"
+        />
+        <Metric
+          label="P10 / median / P90"
+          value={`${gw(stats.p10)} / ${gw(stats.median)} / ${gw(stats.p90)}`}
+          detail="Forecast generation percentiles · GW"
+        />
+        <Metric
+          label="Largest upward ramp"
+          value={`+${mw(stats.largestRampUp.change)} MW`}
+          detail={`Forecast increase by ${clock(stats.largestRampUp.time)}`}
+        />
+        <Metric
+          label="Largest downward ramp"
+          value={`−${mw(Math.abs(stats.largestRampDown.change))} MW`}
+          detail={`Forecast decrease by ${clock(stats.largestRampDown.time)}`}
+        />
       </dl>
+
+      <div className="distribution-profile">
+        <div className="daypart-heading">
+          <div>
+            <h3>How often each output range is expected</h3>
+            <p>Half-hour periods grouped by average generation</p>
+          </div>
+          <div className="daypart-legend" aria-hidden="true">
+            <span><i className="daypart-key forecast-key" /> Forecast</span>
+            {revealed && stats.actualCount > 0 && <span><i className="daypart-key actual-key" /> Actual</span>}
+          </div>
+        </div>
+        <div className="chart-box distribution-chart">
+          <ResponsiveContainer width="100%" height={230}>
+            <BarChart data={stats.distribution} margin={{ top: 8, right: 12, bottom: 8, left: 0 }}>
+              <CartesianGrid stroke="var(--line)" strokeDasharray="2 4" vertical={false} />
+              <XAxis dataKey="range" tick={{ fill: "var(--muted)", fontSize: 10 }} stroke="var(--line)" />
+              <YAxis allowDecimals={false} width={34} tick={{ fill: "var(--muted)", fontSize: 11 }} stroke="var(--line)" />
+              <Tooltip
+                contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8 }}
+                formatter={(value, name) => [`${value} half-hours`, name === "forecast" ? "Forecast" : "Actual"]}
+              />
+              <Bar dataKey="forecast" name="Forecast" fill="var(--green)" radius={[4, 4, 0, 0]} />
+              {revealed && stats.actualCount > 0 && (
+                <Bar dataKey="actual" name="Actual" fill="var(--actual)" radius={[4, 4, 0, 0]} />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
       <div className="daypart-profile">
         <div className="daypart-heading">
@@ -235,6 +347,14 @@ export default function ForecastInsights({ points, revealed }) {
             <Metric label="Wind energy delivered" value={`${stats.actualEnergyGwh.toFixed(1)} GWh`} detail="Estimated from half-hour actuals" />
             <Metric label="Actual peak" value={`${mw(stats.actualPeak.actual)} MW`} detail={`Observed at ${clock(stats.actualPeak.time)}`} />
             <Metric label="Typical daily miss" value={`${mw(stats.actualMae)} MW`} detail="Mean absolute forecast error" />
+            <Metric label="Root mean square error" value={`${mw(stats.actualRmse)} MW`} detail="Penalizes larger misses" />
+            {stats.actualWape != null && (
+              <Metric
+                label="Weighted absolute error (WAPE)"
+                value={`${stats.actualWape.toFixed(1)}%`}
+                detail="Absolute error ÷ total actual generation"
+              />
+            )}
             <Metric
               label="Average forecast bias"
               value={signedBias}
