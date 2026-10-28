@@ -15,9 +15,18 @@ def test_store_loads_forecasts_and_serves_delivery_day(tmp_path, monkeypatch):
     ).to_csv(raw_dir / "actuals.csv", index=False)
     pd.DataFrame(
         {
-            "startTime": timestamps,
-            "publishTime": ["2026-01-01T08:00:00Z"] * 2,
-            "generation": [110.0, 130.0],
+            "startTime": [
+                *timestamps,
+                "2025-12-19T00:00:00Z",
+                "2026-02-02T00:00:00Z",
+            ],
+            "publishTime": [
+                "2026-01-01T08:00:00Z",
+                "2026-01-01T08:00:00Z",
+                "2025-12-18T08:00:00Z",
+                "2026-02-01T08:00:00Z",
+            ],
+            "generation": [110.0, 130.0, 90.0, 80.0],
         }
     ).to_csv(raw_dir / "forecasts.csv", index=False)
 
@@ -36,6 +45,7 @@ def test_store_loads_forecasts_and_serves_delivery_day(tmp_path, monkeypatch):
     assert day["forecast"].tolist() == [110.0, 130.0]
     assert day["actual"].tolist() == [100.0, 120.0]
     assert day["cutoff"].iloc[0] == pd.Timestamp("2026-01-01T09:00:00Z")
+    assert store.dates == ["2026-01-02"]
 
 
 def test_require_day_rejects_non_iso_date():

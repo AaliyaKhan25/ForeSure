@@ -17,10 +17,12 @@ ForeSure brings together a wind-generation forecast, a transparent decision-time
 - [Prerequisites](#prerequisites)
 - [Run locally](#run-locally)
 - [Run with Docker Compose](#run-with-docker-compose)
+- [Deploy to Vercel](#deploy-to-vercel)
 - [Configuration](#configuration)
 - [Testing and validation](#testing-and-validation)
 - [Operational notes and troubleshooting](#operational-notes-and-troubleshooting)
 - [Known limitations and next steps](#known-limitations-and-next-steps)
+- [AI-assisted development](#ai-assisted-development)
 
 ## Problem and product goals
 
@@ -60,7 +62,7 @@ Browser ── HTTP ──► NGINX (static SPA + /api reverse proxy)
 
 1. The browser loads the React single-page application. NGINX serves built assets and falls back to `index.html` for client-side routes.
 2. The frontend requests dates and aggregate metrics, then requests a briefing and forecast for the selected delivery day.
-3. FastAPI loads the two CSV files, validates the required columns and timestamps, selects a forecast per delivery interval, joins observations, and derives historical error statistics.
+3. FastAPI loads the two CSV files, validates the required columns and timestamps, selects a forecast per delivery interval, limits delivery dates to January 2–February 1 (the days corresponding to January 1–31 decision dates), joins observations, and derives historical error statistics.
 4. The resulting data store is cached in-process (`lru_cache(maxsize=1)`) and reused by API handlers. The API does not call Elexon while serving a normal dashboard request.
 5. In Docker Compose, NGINX resolves `backend` through the Compose network. Only the frontend port is published to the host; the backend port is internal to the Compose network.
 
@@ -333,6 +335,49 @@ docker compose down --volumes
 
 For a public host, set `FRONTEND_PORT=80` in a root `.env` file and put a TLS-terminating reverse proxy or load balancer in front of the frontend. Restrict inbound traffic to the intended web ports, keep port `8000` private, and establish backups for the named data volume.
 
+## Deploy to Vercel
+
+The root [`vercel.json`](./vercel.json) configures ForeSure as one Vercel project with two services, following Vercel's [Vite + FastAPI services example](https://github.com/vercel/examples/tree/de867239d0a7dd55c9130f1e3f87fcf877db96e8/services/vite-fastapi):
+
+- **`frontend`** builds the Vite application from `frontend/` and serves its static output.
+- **`backend`** exposes the FastAPI ASGI application at `app.main:app` from `backend/`.
+- Requests to `/api/*` are routed to the Python service; all other paths are routed to the frontend service.
+
+The browser uses the same-origin `/api` base URL, so this deployment does not need a separate API hostname or a CORS-origin change. The backend service root includes the checked-in sample CSV files under `backend/app/data/raw/`. The API reads this bundled, fixed dataset and does not write to the serverless filesystem, call Elexon at request time, or require a persistent volume. The one-off fetch script is not run during Vercel builds, and the sample is not automatically refreshed.
+
+> **Platform note:** Vercel Services are currently in beta. The repository configuration has not been linked to a Vercel account or deployed from this environment; verify that Services are available to your account and inspect the deployment build logs.
+
+### Deploy from the Vercel dashboard
+
+1. Push the repository to GitHub and sign in to [Vercel](https://vercel.com/).
+2. Select **Add New → Project** and import `AaliyaKhan25/ForeSure`.
+3. Keep the project root at the repository root (`.`). Do not set it to `frontend/`; the root `vercel.json` needs to configure both services.
+4. Review the detected service configuration and deploy. No Docker installation or environment variable is required for the fixed sample.
+5. After the deployment succeeds, open the assigned Vercel URL and verify:
+   - `/` loads the dashboard.
+   - `/api/health` returns `{"status":"ok"}`.
+   - `/api/dates` returns delivery dates.
+   - `/api/forecast?date=2026-01-02` returns forecast points with real sample actuals where observations are available.
+
+If GitHub is not linked, the Vercel CLI can deploy from the repository root. Install Node.js first, then run in PowerShell:
+
+```powershell
+npm install --global vercel
+cd D:\ForeSure
+vercel login
+vercel
+```
+
+The first `vercel` deployment creates a preview deployment and links the local directory to a Vercel project. To publish a production deployment afterwards:
+
+```powershell
+vercel --prod
+```
+
+Vercel authentication and project ownership are controlled by your Vercel account; do not commit access tokens. The repository currently has no linked Vercel project. Anonymous CLI deployments are temporary and expire unless claimed; use an authenticated account deployment for a persistent project URL.
+
+Vercel's Python Functions are serverless. This is appropriate for the fixed, read-only sample but is not configured as a continuously running API server. Function cold starts and runtime/resource limits should be measured before using it for production trading workflows.
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -375,6 +420,7 @@ The tests cover:
 - Selecting the latest publication at or before the cutoff, including a publication exactly at the cutoff.
 - Excluding forecasts published after the cutoff.
 - Selecting forecasts independently for different delivery slots.
+- Restricting served delivery dates to the assignment's January 2026 decision window.
 - Calculating MAE, RMSE, and bias with the documented sign convention.
 - Excluding missing actuals from error metrics.
 - Loading CSV data, joining actuals to forecasts, and validating the requested delivery date.
@@ -431,3 +477,7 @@ docker compose logs --tail 100 frontend
 - **Cache refresh:** data reload currently requires a backend restart.
 - **No authentication or authorization:** the API is designed as a read-only prototype. A public deployment needs an explicit access-control, rate-limiting, logging, and data-governance design appropriate to its audience.
 - **Production hardening:** add automated deployment and image scanning, pinned/reproducible dependency builds, secure secret and environment management, TLS, backups, and monitoring before relying on this service operationally.
+
+## AI-assisted development
+
+GitHub Copilot (Copilot SDK in VS Code) was used to assist with repository analysis, implementation and troubleshooting, deployment configuration, and technical documentation. The resulting changes were reviewed against the source code and validated with the available frontend build and backend tests; AI assistance does not replace independent review or operational validation.

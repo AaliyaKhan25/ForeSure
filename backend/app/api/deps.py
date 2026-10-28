@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 
@@ -67,6 +68,11 @@ def _load_store() -> ForecastStore:
     )
 
     selected = select_latest_before_cutoff(forecasts)
+    first_delivery_day = (config.FIRST_DECISION_DAY + timedelta(days=1)).isoformat()
+    last_delivery_day = (config.LAST_DECISION_DAY + timedelta(days=1)).isoformat()
+    selected = selected[
+        selected["delivery_date"].between(first_delivery_day, last_delivery_day)
+    ].copy()
     if selected.empty:
         raise HTTPException(
             status_code=503,
