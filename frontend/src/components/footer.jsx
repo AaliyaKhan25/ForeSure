@@ -20,6 +20,7 @@ export default function Footer() {
           <NavLink to="briefing">Daily briefing</NavLink>
           <NavLink to="accuracy">Accuracy</NavLink>
           <NavLink to="method">Method</NavLink>
+          <NavLink to="knowledge">Knowledge base</NavLink>
         </nav>
         <p className="footer-text">Wind data from Elexon BMRS (FUELHH and WINDFOR datasets).</p>
       </div>

@@ -28,6 +28,7 @@ export default function Navbar() {
           <NavLink to="briefing">Daily briefing</NavLink>
           <NavLink to="accuracy">Accuracy</NavLink>
           <NavLink to="method">Method</NavLink>
+          <NavLink to="knowledge">Learn</NavLink>
         </nav>
         <NavLink to="briefing" className="btn btn-primary nav-cta">
           Open the briefing

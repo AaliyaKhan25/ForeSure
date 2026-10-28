@@ -185,7 +185,7 @@ function Metric({ label, value, detail, featured = false }) {
   );
 }
 
-export default function ForecastInsights({ points, revealed }) {
+export default function ForecastInsights({ points }) {
   const stats = summarize(points);
   if (!stats) return null;
 
@@ -271,7 +271,7 @@ export default function ForecastInsights({ points, revealed }) {
           </div>
           <div className="daypart-legend" aria-hidden="true">
             <span><i className="daypart-key forecast-key" /> Forecast</span>
-            {revealed && stats.actualCount > 0 && <span><i className="daypart-key actual-key" /> Actual</span>}
+            {stats.actualCount > 0 && <span><i className="daypart-key actual-key" /> Actual</span>}
           </div>
         </div>
         <div className="chart-box distribution-chart">
@@ -282,10 +282,10 @@ export default function ForecastInsights({ points, revealed }) {
               <YAxis allowDecimals={false} width={34} tick={{ fill: "var(--muted)", fontSize: 11 }} stroke="var(--line)" />
               <Tooltip
                 contentStyle={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8 }}
-                formatter={(value, name) => [`${value} half-hours`, name === "forecast" ? "Forecast" : "Actual"]}
+                formatter={(value, name) => [`${value} half-hours`, name]}
               />
               <Bar dataKey="forecast" name="Forecast" fill="var(--green)" radius={[4, 4, 0, 0]} />
-              {revealed && stats.actualCount > 0 && (
+              {stats.actualCount > 0 && (
                 <Bar dataKey="actual" name="Actual" fill="var(--actual)" radius={[4, 4, 0, 0]} />
               )}
             </BarChart>
@@ -301,13 +301,13 @@ export default function ForecastInsights({ points, revealed }) {
           </div>
           <div className="daypart-legend" aria-hidden="true">
             <span><i className="daypart-key forecast-key" /> Forecast</span>
-            {revealed && stats.actualCount > 0 && <span><i className="daypart-key actual-key" /> Actual</span>}
+            {stats.actualCount > 0 && <span><i className="daypart-key actual-key" /> Actual</span>}
           </div>
         </div>
         <div
           className="daypart-rows"
           role="img"
-          aria-label={`Average generation by time of day: ${stats.dayparts.map((part) => `${part.label} forecast ${part.forecastMean == null ? "unavailable" : `${mw(part.forecastMean)} megawatts`}${revealed && part.actualMean != null ? `, actual ${mw(part.actualMean)} megawatts` : ""}`).join("; ")}.`}
+          aria-label={`Average generation by time of day: ${stats.dayparts.map((part) => `${part.label} forecast ${part.forecastMean == null ? "unavailable" : `${mw(part.forecastMean)} megawatts`}${part.actualMean != null ? `, actual ${mw(part.actualMean)} megawatts` : ", actual unavailable"}`).join("; ")}.`}
         >
           {stats.dayparts.map((part) => (
             <div className="daypart-row" key={part.label}>
@@ -317,7 +317,7 @@ export default function ForecastInsights({ points, revealed }) {
                   className="daypart-bar forecast-bar"
                   style={{ "--bar-size": `${part.forecastMean == null ? 0 : (part.forecastMean / stats.peak.forecast) * 100}%` }}
                 />
-                {revealed && part.actualMean != null && (
+                {part.actualMean != null && (
                   <span
                     className="daypart-bar actual-bar"
                     style={{ "--bar-size": `${(part.actualMean / stats.peak.forecast) * 100}%` }}
@@ -325,19 +325,19 @@ export default function ForecastInsights({ points, revealed }) {
                 )}
               </div>
               <span className="daypart-value">{part.forecastMean == null ? "—" : `${gw(part.forecastMean)} GW`}</span>
-              {revealed && part.actualMean != null && (
-                <span className="daypart-actual">{gw(part.actualMean)} actual</span>
-              )}
+              <span className="daypart-actual">
+                {part.actualMean == null ? "— actual" : `${gw(part.actualMean)} actual`}
+              </span>
             </div>
           ))}
         </div>
       </div>
 
-      {revealed && stats.actualCount > 0 && (
+      {stats.actualCount > 0 && (
         <div className="actual-insights">
           <div className="actual-insights-heading">
             <div>
-              <p className="eyebrow">Actuals revealed</p>
+              <p className="eyebrow">Observed generation</p>
               <h3>How the forecast compared</h3>
             </div>
             <span className="sample-count">{stats.actualCount} half-hour actuals</span>
@@ -384,8 +384,15 @@ export default function ForecastInsights({ points, revealed }) {
           </dl>
         </div>
       )}
+      {stats.actualCount === 0 && (
+        <p className="insights-footnote">
+          Actual generation is not available for this delivery day yet. Forecasts are shown separately;
+          observed values will appear here when the source data provides them.
+        </p>
+      )}
       <p className="insights-footnote">
-        Energy is estimated from the 48 half-hour average-power forecasts. Forecast ranges and actuals are shown when provided by the source data.
+        Forecast energy is estimated from half-hour average power. Actuals and error measures use
+        only periods with observed generation available.
       </p>
     </section>
   );

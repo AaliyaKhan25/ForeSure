@@ -1,6 +1,6 @@
 import { longDate, shortDate } from "../utils/format.js";
 
-export default function TimeMachine({ dates, date, onChange, revealed, onToggleReveal }) {
+export default function TimeMachine({ dates, date, onChange }) {
   const idx = Math.max(0, dates.indexOf(date));
   const go = (i) => onChange(dates[Math.min(dates.length - 1, Math.max(0, i))]);
 
@@ -38,14 +38,6 @@ export default function TimeMachine({ dates, date, onChange, revealed, onToggleR
           aria-label="Next delivery day"
         >
           <span className="step-label">Next</span> <span aria-hidden="true">→</span>
-        </button>
-        <button
-          className={`btn reveal-toggle ${revealed ? "is-on" : ""}`}
-          onClick={onToggleReveal}
-          aria-pressed={revealed}
-        >
-          <span className="toggle-indicator" aria-hidden="true" />
-          {revealed ? "Hide actuals" : "Reveal actuals"}
         </button>
       </div>
     </section>

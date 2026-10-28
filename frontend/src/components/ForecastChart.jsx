@@ -20,16 +20,18 @@ function ChartTooltip({ active, payload, label }) {
       <div className="muted">
         Likely range: {mw(row.band[0])} to {mw(row.band[1])} MW
       </div>
-      {row.actual != null && <div className="tip-actual">Actual: {mw(row.actual)} MW</div>}
+      <div className="tip-actual">
+        {row.actual == null ? "Actual: not available" : `Actual: ${mw(row.actual)} MW`}
+      </div>
     </div>
   );
 }
 
-export default function ForecastChart({ points, revealed }) {
+export default function ForecastChart({ points }) {
   const data = points.map((p) => ({
     t: clock(p.time),
     forecast: p.forecast,
-    actual: revealed ? p.actual : null,
+    actual: p.actual,
     band: [p.lower, p.upper],
   }));
 
@@ -44,8 +46,8 @@ export default function ForecastChart({ points, revealed }) {
           <li>
             <span className="swatch swatch-band" /> Likely range
           </li>
-          <li className={revealed ? "" : "legend-off"}>
-            <span className="swatch swatch-actual" /> Actual
+          <li>
+            <span className="swatch swatch-actual" /> Actual generation
           </li>
         </ul>
       </div>
@@ -71,7 +73,7 @@ export default function ForecastChart({ points, revealed }) {
               strokeDasharray="5 3"
               dot={false}
               connectNulls={false}
-              isAnimationActive={revealed}
+              isAnimationActive={false}
             />
           </ComposedChart>
         </ResponsiveContainer>

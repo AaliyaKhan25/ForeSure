@@ -1,6 +1,7 @@
 import Dashboard from "./pages/Dashboard.jsx";
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/footer.jsx";
+import SiteGrid from "./components/SiteGrid.jsx";
 import { RouterContext, useHashRoute } from "./hooks/Usehashroute.js";
 
 export const APP_NAME = "ForeSure";
@@ -11,6 +12,7 @@ export default function App() {
   return (
     <RouterContext.Provider value={router}>
       <div className="site-shell">
+        <SiteGrid />
         <Navbar />
         <div className={`page-frame phase-${router.phase}`}>
           <Dashboard route={router.route} />

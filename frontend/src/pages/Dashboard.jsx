@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useForecastData } from "../hooks/useForecastData.js";
 import BriefingCard from "../components/BriefingCard.jsx";
 import ForecastChart from "../components/ForecastChart.jsx";
@@ -11,7 +10,8 @@ import Loader from "../components/Loader.jsx";
 import PageHeader from "../components/Pageheader.jsx";
 import Reveal from "../components/Reveal.jsx";
 import NavLink from "../components/Navlink.jsx";
-import { gw, mw, shortDate } from "../utils/format.js";
+import KnowledgeBasePage from "./KnowledgeBasePage.jsx";
+import { clock, gw, mw, shortDate } from "../utils/format.js";
 
 function HomePage({ metrics, briefing, forecast, loading }) {
   return (
@@ -101,13 +101,13 @@ function HomePage({ metrics, briefing, forecast, loading }) {
               </div>
             </Reveal>
             <Reveal className="story-chart" delay={140}>
-              <ForecastChart points={forecast.points} revealed={false} />
+              <ForecastChart points={forecast.points} />
             </Reveal>
           </div>
         )}
         {!loading && forecast && (
           <Reveal delay={180}>
-            <ForecastInsights points={forecast.points} revealed={false} />
+            <ForecastInsights points={forecast.points} />
           </Reveal>
         )}
       </Reveal>
@@ -156,8 +156,8 @@ function HomePage({ metrics, briefing, forecast, loading }) {
             <span className="card-index">03</span>
             <div className="unfold-body"><div className="unfold-inner">
               <h3>Know what’s underneath</h3>
-              <p>Learn how the cutoff, uncertainty range, and performance measures are put together.</p>
-              <NavLink to="method" className="text-link">Read our method <span aria-hidden="true">→</span></NavLink>
+              <p>Learn the forecast language, explore common buyer questions, and follow a simple learning path.</p>
+              <NavLink to="knowledge" className="text-link">Visit the knowledge base <span aria-hidden="true">→</span></NavLink>
             </div></div>
           </Reveal>
         </div>
@@ -167,19 +167,54 @@ function HomePage({ metrics, briefing, forecast, loading }) {
         <BuyerSurvey />
       </Reveal>
 
-      <Reveal as="section" className="closing-panel wrap section-arrival">
-        <p className="eyebrow">A little more certainty, where it counts</p>
-        <h2>Make your next wind decision with <em>the full picture.</em></h2>
-        <NavLink to="briefing" className="btn btn-primary">
-          View the daily briefing <span aria-hidden="true">↗</span>
-        </NavLink>
+      <Reveal as="section" className="closing-panel wrap section-arrival" aria-labelledby="buyer-case-title">
+        <div className="closing-copy">
+          <p className="eyebrow">For wind buyers and energy teams</p>
+          <h2 id="buyer-case-title">Don’t just see the forecast. <em>See the risk around it.</em></h2>
+          <p>
+            Compare the day-ahead outlook with historical error and a suggested planning buffer,
+            so your team can weigh uncertainty before making a buying decision.
+          </p>
+        </div>
+        <div className="closing-evidence" aria-label="Forecast evidence">
+          <div>
+            <span>Typical forecast error</span>
+            <strong>{metrics ? `${mw(metrics.mae)} MW` : "—"}</strong>
+            <small>
+              {metrics
+                ? `Mean absolute error across ${metrics.n.toLocaleString("en-GB")} observed half-hours`
+                : "Historical performance data"}
+            </small>
+          </div>
+          <div>
+            <span>Suggested planning buffer</span>
+            <strong>{briefing ? `${mw(briefing.buffer_mw)} MW` : "—"}</strong>
+            <small>
+              {briefing
+                ? `For the selected delivery day · ${shortDate(briefing.date)}`
+                : "For the selected delivery day"}
+            </small>
+          </div>
+          <div>
+            <span>Forecast decision cutoff</span>
+            <strong>{briefing ? clock(briefing.cutoff) : "—"}</strong>
+            <small>Latest forecast published before the preceding day’s cutoff</small>
+          </div>
+        </div>
+        <div className="closing-actions">
+          <NavLink to="briefing" className="btn btn-primary">
+            Review the daily briefing <span aria-hidden="true">↗</span>
+          </NavLink>
+          <NavLink to="accuracy" className="text-link">Check historical performance <span aria-hidden="true">→</span></NavLink>
+        </div>
+        <p className="closing-caveat">Historical performance is useful evidence, not a guarantee of future output.</p>
       </Reveal>
 
     </main>
   );
 }
 
-function BriefingPage({ dates, date, setDate, briefing, forecast, loading, revealed, setRevealed }) {
+function BriefingPage({ dates, date, setDate, briefing, forecast, loading }) {
   return (
     <main className="page-content wrap">
       <PageHeader
@@ -191,8 +226,6 @@ function BriefingPage({ dates, date, setDate, briefing, forecast, loading, revea
           dates={dates}
           date={date}
           onChange={setDate}
-          revealed={revealed}
-          onToggleReveal={() => setRevealed((value) => !value)}
         />
       </Reveal>
       {loading || !briefing || !forecast ? (
@@ -201,9 +234,9 @@ function BriefingPage({ dates, date, setDate, briefing, forecast, loading, revea
         <>
           <Reveal><BriefingCard briefing={briefing} /></Reveal>
           <Reveal delay={60}>
-            <ForecastInsights points={forecast.points} revealed={revealed} />
+            <ForecastInsights points={forecast.points} />
           </Reveal>
-          <Reveal delay={90}><ForecastChart points={forecast.points} revealed={revealed} /></Reveal>
+          <Reveal delay={90}><ForecastChart points={forecast.points} /></Reveal>
         </>
       )}
     </main>
@@ -288,9 +321,7 @@ function MethodPage() {
 export default function Dashboard({ route = "home" }) {
   const { dates, date, setDate, metrics, briefing, forecast, loading, error, usingMock } =
     useForecastData();
-  const [revealed, setRevealed] = useState(false);
-
-  useEffect(() => setRevealed(false), [date]);
+  if (route === "knowledge") return <KnowledgeBasePage />;
 
   if (error) {
     return (
@@ -321,8 +352,6 @@ export default function Dashboard({ route = "home" }) {
           briefing={briefing}
           forecast={forecast}
           loading={loading}
-          revealed={revealed}
-          setRevealed={setRevealed}
         />
       )}
       {route === "accuracy" && <AccuracyPage metrics={metrics} briefing={briefing} />}

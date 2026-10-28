@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 // Tiny hash router (#/briefing). No extra dependency, and it works on Vercel
 // without any rewrite rules.
 
-export const ROUTES = ["home", "briefing", "accuracy", "method"];
+export const ROUTES = ["home", "briefing", "accuracy", "method", "knowledge"];
 
 export const RouterContext = createContext({ route: "home", phase: "idle", go: () => {} });
 export const useRouter = () => useContext(RouterContext);
