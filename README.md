@@ -347,6 +347,8 @@ The browser uses the same-origin `/api` base URL, so this deployment does not ne
 
 > **Platform note:** Vercel Services are currently in beta. The repository configuration has not been linked to a Vercel account or deployed from this environment; verify that Services are available to your account and inspect the deployment build logs.
 
+The Vercel frontend service invokes Vite through Node directly instead of the generated `.bin/vite` shell launcher. Its npm manifest explicitly allows only esbuild's install script, which Vite needs for its platform-specific build binary.
+
 ### Deploy from the Vercel dashboard
 
 1. Push the repository to GitHub and sign in to [Vercel](https://vercel.com/).
